@@ -1,38 +1,39 @@
 import { useEffect, useState } from 'react'
 import {
   Button,
-  Form,
   Input,
-  Modal,
   Popconfirm,
-  Select,
   Space,
   Table,
   Tag,
   Typography,
   message,
 } from 'antd'
-import { PlusOutlined } from '@ant-design/icons'
-import { foldersApi } from '@/api'
-import type { Folder } from '@/types/api'
-
-const LANG_OPTIONS = [
-  { value: 'en', label: 'English' },
-  { value: 'jp', label: '日本語' },
-  { value: 'zh', label: '中文' },
-]
+import { ReloadOutlined } from '@ant-design/icons'
+import { adminApi } from '@/api'
+import { UserPicker } from '@/components/UserPicker'
+import type { AdminFolderRow } from '@/types/api'
 
 export default function FoldersPage() {
-  const [data, setData] = useState<Folder[]>([])
+  const [data, setData] = useState<AdminFolderRow[]>([])
+  const [total, setTotal] = useState(0)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(20)
+  const [userId, setUserId] = useState<string | undefined>()
+  const [keyword, setKeyword] = useState('')
   const [loading, setLoading] = useState(false)
-  const [open, setOpen] = useState(false)
-  const [editing, setEditing] = useState<Folder | null>(null)
-  const [form] = Form.useForm<{ name: string; language: string }>()
 
   const load = async () => {
     setLoading(true)
     try {
-      setData(await foldersApi.list())
+      const res = await adminApi.listFolders({
+        page,
+        pageSize,
+        userId,
+        keyword: keyword || undefined,
+      })
+      setData(res.rows)
+      setTotal(res.total)
     } finally {
       setLoading(false)
     }
@@ -40,35 +41,11 @@ export default function FoldersPage() {
 
   useEffect(() => {
     load()
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, pageSize, userId])
 
-  const openCreate = () => {
-    setEditing(null)
-    form.resetFields()
-    setOpen(true)
-  }
-
-  const openEdit = (row: Folder) => {
-    setEditing(row)
-    form.setFieldsValue({ name: row.name, language: row.language })
-    setOpen(true)
-  }
-
-  const onSubmit = async () => {
-    const values = await form.validateFields()
-    if (editing) {
-      await foldersApi.update(editing.id, values)
-      message.success('已更新')
-    } else {
-      await foldersApi.create(values)
-      message.success('已创建')
-    }
-    setOpen(false)
-    load()
-  }
-
-  const onDelete = async (id: string) => {
-    await foldersApi.remove(id)
+  const onDelete = async (row: AdminFolderRow) => {
+    await adminApi.deleteFolder(row.id)
     message.success('已删除')
     load()
   }
@@ -79,60 +56,71 @@ export default function FoldersPage() {
         <Typography.Title level={4} style={{ margin: 0 }}>
           单词分类
         </Typography.Title>
-        <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-          新建分类
-        </Button>
+        <Space>
+          <UserPicker
+            value={userId}
+            onChange={(v) => {
+              setUserId(v)
+              setPage(1)
+            }}
+          />
+          <Input.Search
+            placeholder="搜索分类名"
+            allowClear
+            style={{ width: 200 }}
+            onSearch={(v) => {
+              setKeyword(v)
+              setPage(1)
+              load()
+            }}
+          />
+          <Button icon={<ReloadOutlined />} onClick={load}>
+            刷新
+          </Button>
+        </Space>
       </Space>
+
       <Table
         rowKey="id"
         loading={loading}
         dataSource={data}
-        pagination={{ pageSize: 20, showSizeChanger: true }}
+        pagination={{
+          current: page,
+          pageSize,
+          total,
+          showSizeChanger: true,
+          onChange: (p, ps) => {
+            setPage(p)
+            setPageSize(ps)
+          },
+        }}
         columns={[
-          { title: '名称', dataIndex: 'name' },
+          { title: '所属用户', dataIndex: 'username', width: 160 },
+          { title: '分类名', dataIndex: 'name' },
           {
             title: '语言',
             dataIndex: 'language',
-            width: 120,
+            width: 100,
             render: (v: string) => <Tag>{v || '-'}</Tag>,
           },
           { title: '单词数', dataIndex: 'wordCount', width: 100 },
           {
             title: '操作',
-            width: 160,
+            width: 120,
             render: (_v, row) => (
-              <Space>
-                <a onClick={() => openEdit(row)}>编辑</a>
-                <Popconfirm
-                  title="删除该分类？分类下的单词也会被删除"
-                  okText="删除"
-                  okType="danger"
-                  cancelText="取消"
-                  onConfirm={() => onDelete(row.id)}
-                >
-                  <a style={{ color: '#ff4d4f' }}>删除</a>
-                </Popconfirm>
-              </Space>
+              <Popconfirm
+                title="删除该分类？分类下的单词也会被一并删除"
+                okText="删除"
+                okType="danger"
+                cancelText="取消"
+                onConfirm={() => onDelete(row)}
+              >
+                <a style={{ color: '#ff4d4f' }}>删除</a>
+              </Popconfirm>
             ),
           },
         ]}
       />
-      <Modal
-        open={open}
-        onCancel={() => setOpen(false)}
-        onOk={onSubmit}
-        title={editing ? '编辑分类' : '新建分类'}
-        destroyOnHidden
-      >
-        <Form form={form} layout="vertical" preserve={false}>
-          <Form.Item label="名称" name="name" rules={[{ required: true }]}>
-            <Input placeholder="分类名称" />
-          </Form.Item>
-          <Form.Item label="语言" name="language" rules={[{ required: true }]}>
-            <Select options={LANG_OPTIONS} placeholder="选择语言" />
-          </Form.Item>
-        </Form>
-      </Modal>
     </>
   )
 }

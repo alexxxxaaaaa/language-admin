@@ -1,107 +1,52 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   Button,
-  Form,
   Input,
-  Modal,
   Popconfirm,
-  Select,
   Space,
   Table,
   Tag,
   Typography,
   message,
 } from 'antd'
-import { PlusOutlined, ReloadOutlined } from '@ant-design/icons'
+import { ReloadOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
-import { foldersApi, wordsApi } from '@/api'
-import type { Folder, Word } from '@/types/api'
-
-const LANG_OPTIONS = [
-  { value: 'en', label: 'English' },
-  { value: 'jp', label: '日本語' },
-  { value: 'zh', label: '中文' },
-]
+import { adminApi } from '@/api'
+import { UserPicker } from '@/components/UserPicker'
+import type { AdminWordRow } from '@/types/api'
 
 export default function WordsPage() {
-  const [folders, setFolders] = useState<Folder[]>([])
-  const [folderId, setFolderId] = useState<string | undefined>()
+  const [data, setData] = useState<AdminWordRow[]>([])
+  const [total, setTotal] = useState(0)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(20)
+  const [userId, setUserId] = useState<string | undefined>()
   const [keyword, setKeyword] = useState('')
-  const [data, setData] = useState<Word[]>([])
   const [loading, setLoading] = useState(false)
-  const [open, setOpen] = useState(false)
-  const [editing, setEditing] = useState<Word | null>(null)
-  const [form] = Form.useForm()
-
-  const folderOptions = useMemo(
-    () =>
-      folders.map((f) => ({
-        value: f.id,
-        label: `${f.name} (${f.language})`,
-        language: f.language,
-      })),
-    [folders],
-  )
 
   const load = async () => {
     setLoading(true)
     try {
-      const rows = await wordsApi.list({ folderId, q: keyword || undefined })
-      setData(rows)
+      const res = await adminApi.listWords({
+        page,
+        pageSize,
+        userId,
+        keyword: keyword || undefined,
+      })
+      setData(res.rows)
+      setTotal(res.total)
     } finally {
       setLoading(false)
     }
   }
 
   useEffect(() => {
-    foldersApi.list().then(setFolders)
-  }, [])
-
-  useEffect(() => {
     load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [folderId])
+  }, [page, pageSize, userId])
 
-  const openCreate = () => {
-    setEditing(null)
-    form.resetFields()
-    if (folderId) {
-      const f = folders.find((x) => x.id === folderId)
-      form.setFieldsValue({ folderId, language: f?.language })
-    }
-    setOpen(true)
-  }
-
-  const openEdit = (row: Word) => {
-    setEditing(row)
-    form.setFieldsValue({
-      word: row.word,
-      reading: row.reading,
-      meaning: row.meaning,
-      partOfSpeech: row.partOfSpeech,
-      example: row.example,
-      note: row.note,
-      language: row.language,
-      folderId: row.folderId,
-    })
-    setOpen(true)
-  }
-
-  const onSubmit = async () => {
-    const values = await form.validateFields()
-    if (editing) {
-      await wordsApi.update(editing.id, values)
-      message.success('已更新')
-    } else {
-      await wordsApi.create(values)
-      message.success('已创建')
-    }
-    setOpen(false)
-    load()
-  }
-
-  const onDelete = async (id: string) => {
-    await wordsApi.remove(id)
+  const onDelete = async (row: AdminWordRow) => {
+    await adminApi.deleteWord(row.id)
     message.success('已删除')
     load()
   }
@@ -113,44 +58,52 @@ export default function WordsPage() {
           单词
         </Typography.Title>
         <Space>
-          <Select
-            allowClear
-            placeholder="筛选分类"
-            style={{ width: 220 }}
-            value={folderId}
-            onChange={(v) => setFolderId(v)}
-            options={folderOptions}
+          <UserPicker
+            value={userId}
+            onChange={(v) => {
+              setUserId(v)
+              setPage(1)
+            }}
           />
           <Input.Search
-            placeholder="搜索单词 / 词义"
+            placeholder="搜索单词 / 词义 / 读音"
             allowClear
             style={{ width: 240 }}
             onSearch={(v) => {
               setKeyword(v)
+              setPage(1)
               load()
             }}
           />
           <Button icon={<ReloadOutlined />} onClick={load}>
             刷新
           </Button>
-          <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-            新建单词
-          </Button>
         </Space>
       </Space>
+
       <Table
         rowKey="id"
         loading={loading}
         dataSource={data}
-        pagination={{ pageSize: 20, showSizeChanger: true }}
-        scroll={{ x: 1100 }}
+        pagination={{
+          current: page,
+          pageSize,
+          total,
+          showSizeChanger: true,
+          onChange: (p, ps) => {
+            setPage(p)
+            setPageSize(ps)
+          },
+        }}
+        scroll={{ x: 1300 }}
         columns={[
-          { title: '单词', dataIndex: 'word', width: 160, fixed: 'left' },
-          { title: '读音', dataIndex: 'reading', width: 140 },
+          { title: '所属用户', dataIndex: 'username', width: 140, fixed: 'left' },
+          { title: '单词', dataIndex: 'word', width: 160 },
+          { title: '读音', dataIndex: 'reading', width: 120 },
           {
             title: '词性',
             dataIndex: 'partOfSpeech',
-            width: 100,
+            width: 90,
             render: (v: string) => (v ? <Tag>{v}</Tag> : '-'),
           },
           { title: '词义', dataIndex: 'meaning', ellipsis: true },
@@ -161,12 +114,7 @@ export default function WordsPage() {
             width: 80,
             render: (v: string) => <Tag>{v}</Tag>,
           },
-          {
-            title: '分类',
-            dataIndex: ['folder', 'name'],
-            width: 140,
-            render: (_v, r) => r.folder?.name ?? '-',
-          },
+          { title: '分类', dataIndex: 'folderName', width: 140 },
           {
             title: '创建时间',
             dataIndex: 'createdAt',
@@ -175,74 +123,22 @@ export default function WordsPage() {
           },
           {
             title: '操作',
-            width: 140,
+            width: 100,
             fixed: 'right',
             render: (_v, row) => (
-              <Space>
-                <a onClick={() => openEdit(row)}>编辑</a>
-                <Popconfirm
-                  title="删除该单词？"
-                  okText="删除"
-                  okType="danger"
-                  cancelText="取消"
-                  onConfirm={() => onDelete(row.id)}
-                >
-                  <a style={{ color: '#ff4d4f' }}>删除</a>
-                </Popconfirm>
-              </Space>
+              <Popconfirm
+                title="删除该单词？"
+                okText="删除"
+                okType="danger"
+                cancelText="取消"
+                onConfirm={() => onDelete(row)}
+              >
+                <a style={{ color: '#ff4d4f' }}>删除</a>
+              </Popconfirm>
             ),
           },
         ]}
       />
-      <Modal
-        open={open}
-        onCancel={() => setOpen(false)}
-        onOk={onSubmit}
-        title={editing ? '编辑单词' : '新建单词'}
-        width={640}
-        destroyOnHidden
-      >
-        <Form form={form} layout="vertical" preserve={false}>
-          <Space.Compact block>
-            <Form.Item
-              label="单词"
-              name="word"
-              rules={[{ required: true }]}
-              style={{ flex: 1, marginRight: 8 }}
-            >
-              <Input />
-            </Form.Item>
-            <Form.Item label="读音" name="reading" style={{ flex: 1 }}>
-              <Input />
-            </Form.Item>
-          </Space.Compact>
-          <Space.Compact block>
-            <Form.Item label="词性" name="partOfSpeech" style={{ flex: 1, marginRight: 8 }}>
-              <Input placeholder="n. / v. / adj." />
-            </Form.Item>
-            <Form.Item
-              label="语言"
-              name="language"
-              rules={[{ required: true }]}
-              style={{ flex: 1 }}
-            >
-              <Select options={LANG_OPTIONS} />
-            </Form.Item>
-          </Space.Compact>
-          <Form.Item label="分类" name="folderId" rules={[{ required: true }]}>
-            <Select options={folderOptions} placeholder="选择分类" showSearch optionFilterProp="label" />
-          </Form.Item>
-          <Form.Item label="词义" name="meaning" rules={[{ required: true }]}>
-            <Input.TextArea rows={2} />
-          </Form.Item>
-          <Form.Item label="例句" name="example">
-            <Input.TextArea rows={2} />
-          </Form.Item>
-          <Form.Item label="备注" name="note">
-            <Input.TextArea rows={2} />
-          </Form.Item>
-        </Form>
-      </Modal>
     </>
   )
 }

@@ -1,13 +1,13 @@
 import { create } from 'zustand'
-import { http, clearToken } from '@/lib/http'
-import { autoAuth } from '@/lib/autoAuth'
-import type { AuthUser } from '@/types/api'
+import { http, clearToken, setToken } from '@/lib/http'
+import type { AuthUser, LoginResponse } from '@/types/api'
 
 interface AuthState {
   user: AuthUser | null
   loading: boolean
   ready: boolean
   bootstrap: () => Promise<void>
+  login: (username: string, password: string) => Promise<void>
   logout: () => void
 }
 
@@ -19,20 +19,28 @@ export const useAuthStore = create<AuthState>((set) => ({
   async bootstrap() {
     set({ loading: true })
     try {
-      // 先尝试用 localStorage 里的 token 拉一下 /me
-      try {
-        const { data } = await http.get<AuthUser>('/api/auth/me', {
-          headers: { 'x-silent': '1' },
-        })
-        set({ user: data })
-        return
-      } catch {
-        // token 不存在 / 过期，走自动登录
-      }
-      const user = await autoAuth()
-      set({ user })
+      const { data } = await http.get<AuthUser>('/api/auth/me', {
+        headers: { 'x-silent': '1' },
+      })
+      set({ user: data })
+    } catch {
+      set({ user: null })
     } finally {
       set({ loading: false, ready: true })
+    }
+  },
+
+  async login(username, password) {
+    set({ loading: true })
+    try {
+      const { data } = await http.post<LoginResponse>('/api/auth/login', {
+        username,
+        password,
+      })
+      setToken(data.token)
+      set({ user: data.user })
+    } finally {
+      set({ loading: false })
     }
   },
 

@@ -1,10 +1,6 @@
 # Word Sprint Admin
 
-[Word Sprint](https://github.com/) 主站的管理后台 —— 启动后自动用固定账号 `zyd / zyd370710` 登录（账号不存在时自动注册），可以表格化管理这个账号自己的单词分类、单词、笔记、口语分类、口语表达，并查看 AI 用量统计。
-
-> 当前后端 API 是按登录用户过滤的，所以后台展示的数据范围就是 `zyd` 这个账号自己的数据。与主站 server 完全解耦，不需要改 server。
->
-> 自动登录的账号/密码硬编码在 `src/lib/autoAuth.ts`，需要换的话改那一处即可。注意这是前端代码，密码会出现在打包产物里，仅用于个人/内部场景。
+[Word Sprint](https://github.com/) 主站的管理后台 —— 管理员登录后可以跨用户查看 / 删除全部 folders、words、notes、expressions、AI 用量，以及给任意用户重置密码。
 
 ## 技术栈
 
@@ -14,58 +10,63 @@
 - **Axios** + JWT Bearer
 - **React Router v7**
 
-## 目录结构
+## 依赖的 server 改动
 
-```
-language-admin/
-├── src/
-│   ├── api/           # 与 server 通信的薄封装
-│   ├── layouts/       # AdminLayout（Sider + Header）
-│   ├── lib/           # http client（注入 token / 401 自动跳登录）
-│   ├── pages/         # 每个菜单一个页面
-│   ├── store/         # zustand：auth
-│   ├── styles/        # 全局样式
-│   ├── types/         # API 类型
-│   ├── App.tsx        # 路由
-│   └── main.tsx
-└── vite.config.ts     # 开发期 /api 反向代理到 http://localhost:3000
-```
+后台跑起来之前，需要 `language/server` 端已挂上 `/api/admin/*` 路由：
+
+| 文件 | 作用 |
+|---|---|
+| `server/src/middleware/requireAdmin.ts` | 验证 JWT，并要求该用户名在 `ADMIN_USERNAMES` 中 |
+| `server/src/services/adminService.ts` | 跨用户的统计 / 列表 / 删除 / 重置密码逻辑 |
+| `server/src/routes/admin.ts` | `/api/admin/stats`、`/users`、`/folders`、`/words`、`/notes`、`/expressions`、`/ai-usage` |
+| `server/.env` | 加 `ADMIN_USERNAMES="zyd"`（逗号分隔，小写，命中即视为管理员） |
+
+> 没有 `ADMIN_USERNAMES` 或当前账号不在列表里，所有 `/api/admin/*` 调用会返回 403。
+
+## 关于「看到账号密码」
+
+主站 server 把密码存为 **bcrypt 哈希**（单向），后台只能：
+
+1. **显示密码哈希** —— 用户列表上方的「显示密码哈希」开关，打开后哈希列才会拉取（接口参数 `includeHash=true`）。
+2. **重置密码** —— 给某个用户设定新密码，server 端用 bcrypt 重新散列并覆盖原 hash。
+
+没法显示「原密码」是哈希算法的物理限制，不是接口限制。
 
 ## 本地开发
 
-前置：你已经在另一个仓库 `language` 里启动了 server（`http://localhost:3000`）。
-
 ```bash
-# 安装依赖
-npm install
+# 1. 启动主站 server（另一个仓库）
+cd ../language && npm run server:dev    # → http://localhost:3000
 
-# 启动 dev server（默认 http://localhost:5174）
-npm run dev
+# 2. 启动后台
+cd ../language-admin
+npm install
+npm run dev                              # → http://localhost:5174
 ```
 
-打开 http://localhost:5174 ，会自动登录并进入概览页。
+打开 http://localhost:5174/login ，用 `ADMIN_USERNAMES` 中配置的账号密码登录即可。
 
 ### 切换 API 地址
 
-默认开发期通过 vite proxy 走 `/api → http://localhost:3000`。如果想直接指向远端：
+默认开发期 vite proxy 把 `/api` 转到 `http://localhost:3000`。要直连远端：
 
 ```bash
 cp .env.example .env
-# 在 .env 里设置：
-# VITE_API_BASE_URL=https://your-server.example.com
+# 设置 VITE_API_BASE_URL=https://your-server.example.com
 ```
 
 ## 主要页面
 
 | 路径 | 功能 |
 |---|---|
-| `/dashboard` | 数据概览：分类数、单词数、笔记数、口语数、近 30 天 Tokens |
-| `/folders` | 单词分类 CRUD |
-| `/words` | 单词 CRUD，可按分类筛选、按关键词搜索 |
-| `/notes` | 课程笔记 CRUD（内容字段直接保存 HTML / 富文本源码，主站读取后用 Tiptap 渲染） |
-| `/expression-folders` | 口语分类 |
-| `/expressions` | 口语表达 CRUD，可按分类 / 关键词 / 场景过滤 |
-| `/ai-usage` | OpenAI 用量统计（7/14/30 天可切换） |
+| `/login` | 登录（管理员账号） |
+| `/dashboard` | 全局概览：用户数、近 7 天新增、各类总数、AI Tokens 累计 |
+| `/users` | 用户列表：查看哈希、重置密码、删除用户（级联删除全部数据） |
+| `/folders` | 单词分类：按用户筛选 / 删除 |
+| `/words` | 单词：按用户 / 关键词筛选 / 删除 |
+| `/notes` | 课程笔记：按用户筛选 / 查看富文本 / 删除 |
+| `/expressions` | 口语表达：按用户 / 关键词筛选 / 删除 |
+| `/ai-usage` | AI 调用记录与汇总（可按用户筛选） |
 
 ## 构建
 
@@ -73,4 +74,7 @@ cp .env.example .env
 npm run build
 ```
 
-产物输出到 `dist/`，可以直接丢到 Cloudflare Pages / Vercel / 任意静态托管。注意把 `VITE_API_BASE_URL` 设为你的 server 公网地址。
+产物输出到 `dist/`，可丢到 Cloudflare Pages / Vercel / 任意静态托管。生产环境记得：
+
+- `VITE_API_BASE_URL` 设为 server 公网地址
+- server 端把后台的来源加入 CORS 白名单（目前是 `cors()` 全开，需要更严格的话改 `server/src/app.ts`）

@@ -9,78 +9,112 @@ export interface LoginResponse {
   user: AuthUser
 }
 
-export interface Folder {
+export interface Paged<T> {
+  total: number
+  page: number
+  pageSize: number
+  rows: T[]
+}
+
+export interface AdminStats {
+  users: number
+  folders: number
+  words: number
+  notes: number
+  expressions: number
+  expressionFolders: number
+  reviews: number
+  aiLogs: number
+  aiTotalTokens: number
+  aiPromptTokens: number
+  aiCompletionTokens: number
+  last7DaysNewUsers: number
+}
+
+export interface AdminUserRow {
+  id: string
+  username: string
+  passwordHash?: string
+  createdAt: string
+  folderCount: number
+  noteCount: number
+  expressionFolderCount: number
+  aiUsageCount: number
+}
+
+export interface AdminFolderRow {
   id: string
   name: string
   language: string
-  wordCount?: number
+  userId: string
+  username: string
+  wordCount: number
 }
 
-export interface Word {
+export interface AdminWordRow {
   id: string
   word: string
   reading: string
   meaning: string
-  example: string
-  note: string
   partOfSpeech: string
+  example: string
   language: string
   folderId: string
-  sourceNoteId?: string | null
+  folderName: string
+  userId: string
+  username: string
   createdAt: string
-  folder?: { id: string; name: string; language: string }
-  review?: {
-    interval: number
-    repetition: number
-    easeFactor: number
-    nextReviewDate: string
-    lastReviewedAt: string | null
-  } | null
 }
 
-export interface Note {
+export interface AdminNoteRow {
   id: string
   title: string
-  content: string
   course: string
   lesson: string
   createdAt: string
+  userId: string
+  username: string
+  wordCount: number
 }
 
-export interface ExpressionFolder {
-  id: string
-  name: string
-  language: string
+export interface AdminNoteDetail extends AdminNoteRow {
+  content: string
+  user: { username: string }
 }
 
-export interface Expression {
+export interface AdminExpressionRow {
   id: string
   zhText: string
   enCasual: string
   jpCasual: string
   sceneTag: string
-  note: string
   isMastered: boolean
   folderId: string
+  folderName: string
+  language: string
+  userId: string
+  username: string
   createdAt: string
-  updatedAt: string
 }
 
-export interface AiUsageDay {
-  date: string
-  totalTokens: number
+export interface AdminAiUsageRow {
+  id: string
+  word: string
+  language: string
+  model: string
+  feature: string
   promptTokens: number
   completionTokens: number
-  count: number
+  totalTokens: number
+  createdAt: string
+  userId: string
+  username: string
 }
 
-export interface AiUsageSummary {
-  days: AiUsageDay[]
-  total: {
-    totalTokens: number
+export interface AdminAiUsageResponse extends Paged<AdminAiUsageRow> {
+  totals: {
     promptTokens: number
     completionTokens: number
-    count: number
+    totalTokens: number
   }
-  budget?: { daily: number; usedToday: number }
 }

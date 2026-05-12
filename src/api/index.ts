@@ -1,70 +1,89 @@
 import { http } from '@/lib/http'
 import type {
-  AiUsageSummary,
-  Expression,
-  ExpressionFolder,
-  Folder,
-  Note,
-  Word,
+  AdminAiUsageResponse,
+  AdminExpressionRow,
+  AdminFolderRow,
+  AdminNoteDetail,
+  AdminNoteRow,
+  AdminStats,
+  AdminUserRow,
+  AdminWordRow,
+  Paged,
 } from '@/types/api'
 
-export const foldersApi = {
-  list: () => http.get<Folder[]>('/api/folders').then((r) => r.data),
-  create: (data: { name: string; language: string }) =>
-    http.post<Folder>('/api/folders', data).then((r) => r.data),
-  update: (id: string, data: { name?: string; language?: string }) =>
-    http.patch<Folder>(`/api/folders/${id}`, data).then((r) => r.data),
-  remove: (id: string) =>
-    http.delete<{ ok: boolean }>(`/api/folders/${id}`).then((r) => r.data),
+interface PagingParams {
+  page?: number
+  pageSize?: number
+  keyword?: string
 }
 
-export const wordsApi = {
-  list: (params?: { folderId?: string; q?: string }) =>
-    http.get<Word[]>('/api/words', { params }).then((r) => r.data),
-  create: (data: Partial<Word> & { word: string; folderId: string }) =>
-    http.post<Word>('/api/words', data).then((r) => r.data),
-  update: (id: string, data: Partial<Word>) =>
-    http.patch<Word>(`/api/words/${id}`, data).then((r) => r.data),
-  remove: (id: string) =>
-    http.delete<{ ok: boolean }>(`/api/words/${id}`).then((r) => r.data),
-}
+export const adminApi = {
+  stats: () => http.get<AdminStats>('/api/admin/stats').then((r) => r.data),
 
-export const notesApi = {
-  list: () => http.get<Note[]>('/api/notes').then((r) => r.data),
-  detail: (id: string) => http.get<Note>(`/api/notes/${id}`).then((r) => r.data),
-  create: (data: { title: string; content: string; course?: string; lesson?: string }) =>
-    http.post<Note>('/api/notes', data).then((r) => r.data),
-  update: (id: string, data: Partial<Note>) =>
-    http.patch<Note>(`/api/notes/${id}`, data).then((r) => r.data),
-}
-
-export const expressionFoldersApi = {
-  list: () =>
-    http.get<ExpressionFolder[]>('/api/expressions/folders').then((r) => r.data),
-  create: (data: { name: string; language: string }) =>
+  listUsers: (params: PagingParams & { includeHash?: boolean } = {}) =>
     http
-      .post<ExpressionFolder>('/api/expressions/folders', data)
+      .get<Paged<AdminUserRow>>('/api/admin/users', { params })
       .then((r) => r.data),
-}
 
-export const expressionsApi = {
-  list: (params?: {
-    q?: string
-    folderId?: string
-    sceneTag?: string
-    isMastered?: boolean
-  }) => http.get<Expression[]>('/api/expressions', { params }).then((r) => r.data),
-  create: (data: Partial<Expression> & { zhText: string; folderId: string }) =>
-    http.post<Expression>('/api/expressions', data).then((r) => r.data),
-  update: (id: string, data: Partial<Expression>) =>
-    http.patch<Expression>(`/api/expressions/${id}`, data).then((r) => r.data),
-  remove: (id: string) =>
-    http.delete<{ ok: boolean }>(`/api/expressions/${id}`).then((r) => r.data),
-}
-
-export const aiApi = {
-  usage: (days = 14) =>
+  resetUserPassword: (id: string, password: string) =>
     http
-      .get<AiUsageSummary>('/api/ai/usage', { params: { days } })
+      .post<{ ok: boolean }>(`/api/admin/users/${id}/reset-password`, { password })
+      .then((r) => r.data),
+
+  deleteUser: (id: string) =>
+    http.delete<{ ok: boolean }>(`/api/admin/users/${id}`).then((r) => r.data),
+
+  listFolders: (
+    params: PagingParams & { userId?: string; language?: string } = {},
+  ) =>
+    http
+      .get<Paged<AdminFolderRow>>('/api/admin/folders', { params })
+      .then((r) => r.data),
+
+  deleteFolder: (id: string) =>
+    http.delete<{ ok: boolean }>(`/api/admin/folders/${id}`).then((r) => r.data),
+
+  listWords: (
+    params: PagingParams & {
+      userId?: string
+      folderId?: string
+      language?: string
+    } = {},
+  ) =>
+    http
+      .get<Paged<AdminWordRow>>('/api/admin/words', { params })
+      .then((r) => r.data),
+
+  deleteWord: (id: string) =>
+    http.delete<{ ok: boolean }>(`/api/admin/words/${id}`).then((r) => r.data),
+
+  listNotes: (params: PagingParams & { userId?: string; course?: string } = {}) =>
+    http
+      .get<Paged<AdminNoteRow>>('/api/admin/notes', { params })
+      .then((r) => r.data),
+
+  getNoteDetail: (id: string) =>
+    http.get<AdminNoteDetail>(`/api/admin/notes/${id}`).then((r) => r.data),
+
+  deleteNote: (id: string) =>
+    http.delete<{ ok: boolean }>(`/api/admin/notes/${id}`).then((r) => r.data),
+
+  listExpressions: (
+    params: PagingParams & { userId?: string; folderId?: string } = {},
+  ) =>
+    http
+      .get<Paged<AdminExpressionRow>>('/api/admin/expressions', { params })
+      .then((r) => r.data),
+
+  deleteExpression: (id: string) =>
+    http
+      .delete<{ ok: boolean }>(`/api/admin/expressions/${id}`)
+      .then((r) => r.data),
+
+  listAiUsage: (
+    params: PagingParams & { userId?: string; feature?: string } = {},
+  ) =>
+    http
+      .get<AdminAiUsageResponse>('/api/admin/ai-usage', { params })
       .then((r) => r.data),
 }

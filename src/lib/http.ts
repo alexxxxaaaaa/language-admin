@@ -38,9 +38,13 @@ http.interceptors.response.use(
     const msg = error.response?.data?.message ?? error.message ?? '请求失败'
     if (status === 401) {
       clearToken()
-      // 不自动跳转，交给应用层（auto-login）处理
-    }
-    if (!error.config?.headers?.['x-silent']) {
+      message.error('登录已过期，请重新登录')
+      if (location.pathname !== '/login') {
+        location.href = '/login'
+      }
+    } else if (status === 403) {
+      message.error(msg || '无管理员权限')
+    } else if (!error.config?.headers?.['x-silent']) {
       message.error(msg)
     }
     return Promise.reject(error)

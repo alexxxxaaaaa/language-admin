@@ -2,32 +2,41 @@ import { useEffect, useState } from 'react'
 import {
   Button,
   Drawer,
-  Form,
   Input,
-  Modal,
+  Popconfirm,
   Space,
   Table,
   Tag,
   Typography,
   message,
 } from 'antd'
-import { PlusOutlined } from '@ant-design/icons'
+import { ReloadOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
-import { notesApi } from '@/api'
-import type { Note } from '@/types/api'
+import { adminApi } from '@/api'
+import { UserPicker } from '@/components/UserPicker'
+import type { AdminNoteDetail, AdminNoteRow } from '@/types/api'
 
 export default function NotesPage() {
-  const [data, setData] = useState<Note[]>([])
+  const [data, setData] = useState<AdminNoteRow[]>([])
+  const [total, setTotal] = useState(0)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(20)
+  const [userId, setUserId] = useState<string | undefined>()
+  const [keyword, setKeyword] = useState('')
   const [loading, setLoading] = useState(false)
-  const [open, setOpen] = useState(false)
-  const [editing, setEditing] = useState<Note | null>(null)
-  const [form] = Form.useForm()
-  const [viewNote, setViewNote] = useState<Note | null>(null)
+  const [viewNote, setViewNote] = useState<AdminNoteDetail | null>(null)
 
   const load = async () => {
     setLoading(true)
     try {
-      setData(await notesApi.list())
+      const res = await adminApi.listNotes({
+        page,
+        pageSize,
+        userId,
+        keyword: keyword || undefined,
+      })
+      setData(res.rows)
+      setTotal(res.total)
     } finally {
       setLoading(false)
     }
@@ -35,41 +44,18 @@ export default function NotesPage() {
 
   useEffect(() => {
     load()
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, pageSize, userId])
 
-  const openCreate = () => {
-    setEditing(null)
-    form.resetFields()
-    setOpen(true)
-  }
-
-  const openEdit = (row: Note) => {
-    setEditing(row)
-    form.setFieldsValue({
-      title: row.title,
-      course: row.course,
-      lesson: row.lesson,
-      content: row.content,
-    })
-    setOpen(true)
-  }
-
-  const onSubmit = async () => {
-    const values = await form.validateFields()
-    if (editing) {
-      await notesApi.update(editing.id, values)
-      message.success('已更新')
-    } else {
-      await notesApi.create(values)
-      message.success('已创建')
-    }
-    setOpen(false)
-    load()
-  }
-
-  const openView = async (row: Note) => {
-    const full = await notesApi.detail(row.id)
+  const onView = async (row: AdminNoteRow) => {
+    const full = await adminApi.getNoteDetail(row.id)
     setViewNote(full)
+  }
+
+  const onDelete = async (row: AdminNoteRow) => {
+    await adminApi.deleteNote(row.id)
+    message.success('已删除')
+    load()
   }
 
   return (
@@ -78,16 +64,46 @@ export default function NotesPage() {
         <Typography.Title level={4} style={{ margin: 0 }}>
           课程笔记
         </Typography.Title>
-        <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-          新建笔记
-        </Button>
+        <Space>
+          <UserPicker
+            value={userId}
+            onChange={(v) => {
+              setUserId(v)
+              setPage(1)
+            }}
+          />
+          <Input.Search
+            placeholder="搜索标题 / 课节"
+            allowClear
+            style={{ width: 220 }}
+            onSearch={(v) => {
+              setKeyword(v)
+              setPage(1)
+              load()
+            }}
+          />
+          <Button icon={<ReloadOutlined />} onClick={load}>
+            刷新
+          </Button>
+        </Space>
       </Space>
+
       <Table
         rowKey="id"
         loading={loading}
         dataSource={data}
-        pagination={{ pageSize: 20, showSizeChanger: true }}
+        pagination={{
+          current: page,
+          pageSize,
+          total,
+          showSizeChanger: true,
+          onChange: (p, ps) => {
+            setPage(p)
+            setPageSize(ps)
+          },
+        }}
         columns={[
+          { title: '所属用户', dataIndex: 'username', width: 160 },
           { title: '标题', dataIndex: 'title', ellipsis: true },
           {
             title: '课程',
@@ -96,6 +112,7 @@ export default function NotesPage() {
             render: (v: string) => (v ? <Tag>{v}</Tag> : '-'),
           },
           { title: '课节', dataIndex: 'lesson', width: 120 },
+          { title: '关联单词', dataIndex: 'wordCount', width: 100 },
           {
             title: '创建时间',
             dataIndex: 'createdAt',
@@ -104,56 +121,36 @@ export default function NotesPage() {
           },
           {
             title: '操作',
-            width: 160,
+            width: 140,
             render: (_v, row) => (
               <Space>
-                <a onClick={() => openView(row)}>查看</a>
-                <a onClick={() => openEdit(row)}>编辑</a>
+                <a onClick={() => onView(row)}>查看</a>
+                <Popconfirm
+                  title="删除该笔记？"
+                  okText="删除"
+                  okType="danger"
+                  cancelText="取消"
+                  onConfirm={() => onDelete(row)}
+                >
+                  <a style={{ color: '#ff4d4f' }}>删除</a>
+                </Popconfirm>
               </Space>
             ),
           },
         ]}
       />
-      <Modal
-        open={open}
-        onCancel={() => setOpen(false)}
-        onOk={onSubmit}
-        title={editing ? '编辑笔记' : '新建笔记'}
-        width={720}
-        destroyOnHidden
-      >
-        <Form form={form} layout="vertical" preserve={false}>
-          <Form.Item label="标题" name="title" rules={[{ required: true }]}>
-            <Input />
-          </Form.Item>
-          <Space.Compact block>
-            <Form.Item label="课程" name="course" style={{ flex: 1, marginRight: 8 }}>
-              <Input />
-            </Form.Item>
-            <Form.Item label="课节" name="lesson" style={{ flex: 1 }}>
-              <Input />
-            </Form.Item>
-          </Space.Compact>
-          <Form.Item
-            label="内容（HTML / 富文本源码）"
-            name="content"
-            rules={[{ required: true }]}
-            extra="主站 client 用 Tiptap 编辑器，这里直接保存源码字符串"
-          >
-            <Input.TextArea rows={10} />
-          </Form.Item>
-        </Form>
-      </Modal>
+
       <Drawer
         open={!!viewNote}
         onClose={() => setViewNote(null)}
         title={viewNote?.title}
-        width={720}
+        styles={{ wrapper: { width: 720 } }}
       >
         {viewNote && (
           <>
             <Space style={{ marginBottom: 12 }}>
-              {viewNote.course && <Tag color="blue">课程：{viewNote.course}</Tag>}
+              <Tag color="blue">{viewNote.user?.username ?? viewNote.username}</Tag>
+              {viewNote.course && <Tag>课程：{viewNote.course}</Tag>}
               {viewNote.lesson && <Tag>课节：{viewNote.lesson}</Tag>}
               <Tag>{dayjs(viewNote.createdAt).format('YYYY-MM-DD HH:mm')}</Tag>
             </Space>

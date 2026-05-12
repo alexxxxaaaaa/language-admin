@@ -1,64 +1,68 @@
 import { useEffect } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
-import { Result, Spin } from 'antd'
+import { Spin } from 'antd'
 import { useAuthStore } from '@/store/auth'
+import { getToken } from '@/lib/http'
+import LoginPage from '@/pages/Login'
 import AdminLayout from '@/layouts/AdminLayout'
 import DashboardPage from '@/pages/Dashboard'
+import UsersPage from '@/pages/Users'
 import FoldersPage from '@/pages/Folders'
 import WordsPage from '@/pages/Words'
 import NotesPage from '@/pages/Notes'
-import ExpressionFoldersPage from '@/pages/ExpressionFolders'
 import ExpressionsPage from '@/pages/Expressions'
 import AiUsagePage from '@/pages/AiUsage'
 
-export default function App() {
+function RequireAuth({ children }: { children: React.ReactNode }) {
   const ready = useAuthStore((s) => s.ready)
   const user = useAuthStore((s) => s.user)
-  const bootstrap = useAuthStore((s) => s.bootstrap)
-
-  useEffect(() => {
-    bootstrap()
-  }, [bootstrap])
-
   if (!ready) {
     return (
       <div
         style={{
           height: '100vh',
           display: 'flex',
-          flexDirection: 'column',
-          gap: 16,
           alignItems: 'center',
           justifyContent: 'center',
         }}
       >
         <Spin size="large" />
-        <div style={{ color: '#8c8c8c' }}>连接服务中…</div>
       </div>
     )
   }
+  if (!user) return <Navigate to="/login" replace />
+  return <>{children}</>
+}
 
-  if (!user) {
-    return (
-      <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <Result
-          status="warning"
-          title="无法连接到服务"
-          subTitle="确认 language/server 已启动（默认 http://localhost:3000），然后刷新页面"
-        />
-      </div>
-    )
-  }
+export default function App() {
+  const bootstrap = useAuthStore((s) => s.bootstrap)
+
+  useEffect(() => {
+    if (getToken()) {
+      bootstrap()
+    } else {
+      // 没 token 直接 ready=true（会跳登录页）
+      useAuthStore.setState({ ready: true })
+    }
+  }, [bootstrap])
 
   return (
     <Routes>
-      <Route path="/" element={<AdminLayout />}>
+      <Route path="/login" element={<LoginPage />} />
+      <Route
+        path="/"
+        element={
+          <RequireAuth>
+            <AdminLayout />
+          </RequireAuth>
+        }
+      >
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dashboard" element={<DashboardPage />} />
+        <Route path="users" element={<UsersPage />} />
         <Route path="folders" element={<FoldersPage />} />
         <Route path="words" element={<WordsPage />} />
         <Route path="notes" element={<NotesPage />} />
-        <Route path="expression-folders" element={<ExpressionFoldersPage />} />
         <Route path="expressions" element={<ExpressionsPage />} />
         <Route path="ai-usage" element={<AiUsagePage />} />
       </Route>
