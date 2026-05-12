@@ -7,6 +7,7 @@ import LoginPage from '@/pages/Login'
 import AdminLayout from '@/layouts/AdminLayout'
 import DashboardPage from '@/pages/Dashboard'
 import UsersPage from '@/pages/Users'
+import UserDetailPage from '@/pages/UserDetail'
 import FoldersPage from '@/pages/Folders'
 import WordsPage from '@/pages/Words'
 import NotesPage from '@/pages/Notes'
@@ -60,6 +61,7 @@ export default function App() {
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dashboard" element={<DashboardPage />} />
         <Route path="users" element={<UsersPage />} />
+        <Route path="users/:id" element={<UserDetailPage />} />
         <Route path="folders" element={<FoldersPage />} />
         <Route path="words" element={<WordsPage />} />
         <Route path="notes" element={<NotesPage />} />

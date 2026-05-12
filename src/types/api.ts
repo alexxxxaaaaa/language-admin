@@ -42,6 +42,15 @@ export interface AdminUserRow {
   aiUsageCount: number
 }
 
+export interface AdminUserDetail extends AdminUserRow {
+  passwordHash: string
+  wordCount: number
+  expressionCount: number
+  aiTotalTokens: number
+  aiPromptTokens: number
+  aiCompletionTokens: number
+}
+
 export interface AdminFolderRow {
   id: string
   name: string

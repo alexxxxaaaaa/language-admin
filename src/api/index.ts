@@ -6,6 +6,7 @@ import type {
   AdminNoteDetail,
   AdminNoteRow,
   AdminStats,
+  AdminUserDetail,
   AdminUserRow,
   AdminWordRow,
   Paged,
@@ -24,6 +25,9 @@ export const adminApi = {
     http
       .get<Paged<AdminUserRow>>('/api/admin/users', { params })
       .then((r) => r.data),
+
+  getUserDetail: (id: string) =>
+    http.get<AdminUserDetail>(`/api/admin/users/${id}`).then((r) => r.data),
 
   resetUserPassword: (id: string, password: string) =>
     http

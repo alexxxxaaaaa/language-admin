@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   Alert,
   Button,
@@ -14,12 +15,13 @@ import {
   Typography,
   message,
 } from 'antd'
-import { CopyOutlined, KeyOutlined, ReloadOutlined } from '@ant-design/icons'
+import { CopyOutlined, EyeOutlined, KeyOutlined, ReloadOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { adminApi } from '@/api'
 import type { AdminUserRow } from '@/types/api'
 
 export default function UsersPage() {
+  const navigate = useNavigate()
   const [data, setData] = useState<AdminUserRow[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
@@ -183,10 +185,13 @@ export default function UsersPage() {
           },
           {
             title: '操作',
-            width: 200,
+            width: 260,
             fixed: 'right',
             render: (_v, row) => (
               <Space>
+                <a onClick={() => navigate(`/users/${row.id}`)}>
+                  <EyeOutlined /> 详情
+                </a>
                 <a onClick={() => setResetUser(row)}>
                   <KeyOutlined /> 重置密码
                 </a>
