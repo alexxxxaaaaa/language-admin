@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { Layout, Menu, Dropdown, Avatar, Space, Typography } from 'antd'
+import { Layout, Menu, Avatar, Space, Typography } from 'antd'
 import type { MenuProps } from 'antd'
 import {
   DashboardOutlined,
@@ -8,7 +8,6 @@ import {
   FileTextOutlined,
   MessageOutlined,
   ApiOutlined,
-  LogoutOutlined,
   UserOutlined,
   ContainerOutlined,
 } from '@ant-design/icons'
@@ -31,7 +30,6 @@ export default function AdminLayout() {
   const navigate = useNavigate()
   const location = useLocation()
   const user = useAuthStore((s) => s.user)
-  const logout = useAuthStore((s) => s.logout)
 
   const selectedKey = useMemo(() => {
     const item = menuItems?.find(
@@ -39,18 +37,6 @@ export default function AdminLayout() {
     )
     return item ? String((item as { key: string }).key) : '/dashboard'
   }, [location.pathname])
-
-  const userMenu: MenuProps['items'] = [
-    {
-      key: 'logout',
-      icon: <LogoutOutlined />,
-      label: '退出登录',
-      onClick: () => {
-        logout()
-        navigate('/login', { replace: true })
-      },
-    },
-  ]
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
@@ -67,12 +53,10 @@ export default function AdminLayout() {
       <Layout>
         <Header className="layout-header">
           <Typography.Text strong>管理后台</Typography.Text>
-          <Dropdown menu={{ items: userMenu }} placement="bottomRight">
-            <Space style={{ cursor: 'pointer' }}>
-              <Avatar size="small" icon={<UserOutlined />} />
-              <span>{user?.username}</span>
-            </Space>
-          </Dropdown>
+          <Space>
+            <Avatar size="small" icon={<UserOutlined />} />
+            <span>{user?.username}</span>
+          </Space>
         </Header>
         <Content className="layout-content">
           <Outlet />
